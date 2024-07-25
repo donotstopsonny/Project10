@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 74;
 	objects = {
 
 /* Begin PBXFileReference section */
@@ -105,7 +105,6 @@
 				};
 			};
 			buildConfigurationList = 681AE6D92C50A57E00F7590E /* Build configuration list for PBXProject "Project10" */;
-			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -113,6 +112,7 @@
 				Base,
 			);
 			mainGroup = 681AE6D52C50A57E00F7590E;
+			preferredProjectObjectVersion = 60;
 			productRefGroup = 681AE6DF2C50A57E00F7590E /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
