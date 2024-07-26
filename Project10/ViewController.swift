@@ -43,47 +43,67 @@ class ViewController: UICollectionViewController, UIImagePickerControllerDelegat
     }
     
     @objc func addNewPerson() {
-        let ac = UIAlertController(title: "Add New Person", message: "Choose where to get the image", preferredStyle: .alert)
-        
-        let photoLibraryAction = UIAlertAction(title: "Photo Library", style: .default) { [weak self] _ in
-            let picker = UIImagePickerController()
+        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            let ac = UIAlertController(title: "Source", message: nil, preferredStyle: .actionSheet)
+            ac.addAction(UIAlertAction(title: "Photos", style: .default, handler: { [weak self] _ in
+                self?.showPicker(fromCamera: false)
+            }))
+            ac.addAction(UIAlertAction(title: "Camera", style: .default, handler: { [weak self] _ in
+                self?.showPicker(fromCamera: true)
+            }))
+            ac.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            ac.popoverPresentationController?.barButtonItem = navigationItem.leftBarButtonItem
             
-            picker.allowsEditing = true
-            picker.delegate = self
-            self?.present(picker, animated: true)
+            present(ac, animated: true)
         }
-        
-        let cameraAction = UIAlertAction(title: "Camera", style: .default) { [weak self] _ in
-            let picker = UIImagePickerController()
+    }
+    
+    func showPicker(fromCamera: Bool) {
+        let picker = UIImagePickerController()
+        picker.allowsEditing = true
+        picker.delegate = self
+        if fromCamera {
             picker.sourceType = .camera
-            picker.showsCameraControls = true
-            picker.allowsEditing = true
-            picker.delegate = self
-            self?.present(picker, animated: true)
         }
-        
-        ac.addAction(photoLibraryAction)
-        ac.addAction(cameraAction)
-        
-        present(ac, animated: true)
+        present(picker, animated: true)
     }
     
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
         guard let image = info[.editedImage] as? UIImage else { return }
         
-        let imageName = UUID().uuidString
-        let imagePath = getDocumentsDirectory().appendingPathComponent(imageName)
-        
-        if let jpegData = image.jpegData(compressionQuality: 0.8) {
-            try? jpegData.write(to: imagePath)
+        DispatchQueue.global().async { [weak self] in
+            let imageName = UUID().uuidString
+            let imagePath = self?.getDocumentsDirectory().appendingPathComponent(imageName)
+            
+            if let jpegData = image.jpegData(compressionQuality: 0.8) {
+                if let imagePath = imagePath {
+                    try? jpegData.write(to: imagePath)
+                }
+            }
+            
+            let person = Person(name: "Unknown", image: imageName)
+            self?.people.append(person)
+            
+            DispatchQueue.main.async {
+                self?.collectionView.reloadData()
+                self?.dismiss(animated: true)
+            }
+            
         }
-
-        let person = Person(name: "Unknown", image: imageName)
-        people.append(person)
-        print("(in main) 추가된 사람:", people[0].name)
-        collectionView.reloadData()
-
-        dismiss(animated: true)
+//
+//        let imageName = UUID().uuidString
+//        let imagePath = getDocumentsDirectory().appendingPathComponent(imageName)
+//        
+//        if let jpegData = image.jpegData(compressionQuality: 0.8) {
+//            try? jpegData.write(to: imagePath)
+//        }
+//        
+//        let person = Person(name: "Unknown", image: imageName)
+//        people.append(person)
+//        print("(in main) 추가된 사람:", people[0].name)
+//        collectionView.reloadData()
+//        
+//        dismiss(animated: true)
     }
     
     func getDocumentsDirectory() -> URL {
@@ -93,36 +113,90 @@ class ViewController: UICollectionViewController, UIImagePickerControllerDelegat
     
     override func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let person = people[indexPath.item]
-        print("thisis check for person", person.name, person.image)
-        let ac = UIAlertController(title: "Do you want to delete or rename this person", message: nil, preferredStyle: .alert)
         
-        let deleteAction = UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
-            self?.people.remove(at: indexPath.item)
+        let ac = UIAlertController(title: "Person", message: nil, preferredStyle: .actionSheet)
+        ac.addAction(UIAlertAction(title: "Rename person", style: .default, handler: { [weak self] action in
+            self?.renamePersonTapped(person)
+        }))
+        ac.addAction(UIAlertAction(title: "Delete person", style: .default, handler: { [weak self] action in
+            self?.deletePersonTapped(at: indexPath)
+        }))
+        ac.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        
+        if let popoverController = ac.popoverPresentationController {
+            if let cellView = collectionView.cellForItem(at: indexPath) {
+                popoverController.sourceView = cellView
+                popoverController.sourceRect = CGRect(x: cellView.bounds.midX, y: cellView.bounds.midY, width: 0, height: 0)
+            }
+        }
+        present(ac, animated: true)
+    }
+    
+    func renamePersonTapped(_ person: Person) {
+        let ac = UIAlertController(title: "Rename person", message: nil, preferredStyle: .alert)
+        ac.addTextField()
+        
+        ac.addAction(UIAlertAction(title: "OK", style: .default, handler: { [weak self, weak ac] _ in
+            guard let newName = ac?.textFields?[0].text else { return }
+            person.name = newName
             self?.collectionView.reloadData()
-        }
+        }))
         
-        let renameAction = UIAlertAction(title: "Rename", style: .default) { [weak self] _ in
-            let ac = UIAlertController(title: "Enter new name", message: nil, preferredStyle: .alert)
-            ac.addTextField()
-            
-            ac.addAction(UIAlertAction(title: "OK", style: .default) { [weak self, weak ac] _ in
-                guard let newName = ac?.textFields?[0].text else { return }
-                person.name = newName
-                self?.collectionView.reloadData()
-            })
-            
-            ac.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-            
-            self?.present(ac, animated: true)
-        }
+        ac.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        present(ac, animated: true)
+    }
+    
+    func deletePersonTapped(at indexPath: IndexPath) {
+        let ac = UIAlertController(title: "Confirmation", message: "Delete person \" \(people[indexPath.item].name) \" ?", preferredStyle: .alert)
         
-        let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
+        ac.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        ac.addAction(UIAlertAction(title: "OK", style: .default, handler: { [weak self] _ in
+            self?.deletePerson(at: indexPath)
+        }))
         
-        ac.addAction(deleteAction)
-        ac.addAction(renameAction)
-        ac.addAction(cancelAction)
         
         present(ac, animated: true)
     }
+    
+    func deletePerson(at indexPath: IndexPath) {
+        DispatchQueue.global().async { [weak self] in
+            guard let image = self?.people[indexPath.item].image else {
+                self?.showDeleteError()
+                return
+            }
+            
+            guard let imagePath = self?.getDocumentsDirectory().appendingPathComponent(image) else {
+                self?.showDeleteError()
+                return
+            }
+            
+            do {
+                try FileManager.default.removeItem(at: imagePath)
+            }
+            catch {
+                self?.showDeleteError()
+                return
+            }
+            
+            //deletion ok
+            self?.people.remove(at: indexPath.item)
+            
+            DispatchQueue.main.async {
+                self?.collectionView.deleteItems(at: [indexPath])
+            }
+        }
+    }
+    
+    func showDeleteError() {
+        DispatchQueue.main.async { [weak self] in
+            let ac = UIAlertController(title: "Error", message: "Person could not be deleted", preferredStyle: .alert)
+            ac.addAction(UIAlertAction(title: "OK", style: .default))
+            
+            self?.present(ac, animated: true)
+            
+            
+        }
+    }
 }
+
 
